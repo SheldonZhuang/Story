@@ -66,7 +66,8 @@
 
 ### Task 4：时间线 `timeline.py`（TDD）
 接口：`Cue(start, end, zh, en)`、`Span(section, start, end)`、`Timeline(spans, cues, duration)`、`build_timeline(sections, durations: dict[tuple[str,int], float]) -> Timeline`、`Timeline.span_at(t)`、`year_to_axis(year) -> float`（-3,300,000 → 0.0，2056 → 1.0，单调递增）、`save_timeline` / `load_timeline`（JSON 往返）
-- [ ] 测试：留白规则下每段起止与 Cue 时间正确；总时长；`span_at` 边界；`year_to_axis` 端点和单调性；JSON 往返一致
+另有 `duration_warnings(timeline) -> list[str]`：某段实际时长偏离目标超过 50% 时返回警告（build 时打印）
+- [ ] 测试：留白规则下每段起止与 Cue 时间正确；总时长；`span_at` 边界；`year_to_axis` 端点和单调性；JSON 往返一致；偏离 60% 的段落产生警告，偏离 10% 的不产生
 - [ ] 实现 → 测试通过 → 提交
 
 ### Task 5：字幕 `subtitles.py`（TDD）
