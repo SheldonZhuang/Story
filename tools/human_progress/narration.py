@@ -10,7 +10,7 @@ import wave
 from collections.abc import Callable
 from pathlib import Path
 
-from .audio import SR
+from .audio import SR, read_wav, trim_silence, write_wav
 from .script import Section
 
 VOICE = "zh-CN-YunxiNeural"
@@ -21,7 +21,8 @@ Synth = Callable[[str, Path], None]  # (文本, 输出 WAV 路径) -> None
 
 
 def cache_key(text: str, voice: str, rate: str) -> str:
-    return hashlib.sha256(f"{voice}\n{rate}\n{text}".encode("utf-8")).hexdigest()[:16]
+    # 末尾的版本号随后处理方式变化而递增，使旧缓存失效
+    return hashlib.sha256(f"{voice}\n{rate}\n{text}\ntrim1".encode("utf-8")).hexdigest()[:16]
 
 
 def _to_wav(src: Path, dst: Path) -> None:
@@ -94,6 +95,8 @@ def synthesize(
             if not path.exists():
                 tmp = path.with_suffix(".part.wav")
                 _with_retry(synth, line.zh, tmp)
+                # 裁掉 TTS 自带的首尾静音，字幕时间才能贴合实际发声
+                write_wav(tmp, trim_silence(read_wav(tmp)))
                 tmp.replace(path)  # 写完再改名，中断时不留下半个文件
             paths[(sec.id, i)] = path
     return paths

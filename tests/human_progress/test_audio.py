@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 
-from tools.human_progress.audio import SR, ambient, mix, place_narration, read_wav, write_wav
+from tools.human_progress.audio import (
+    SR, ambient, mix, place_narration, read_wav, trim_silence, write_wav,
+)
 from tools.human_progress.script import Line, Section
 from tools.human_progress.timeline import build_timeline
 
@@ -25,6 +27,15 @@ def test_ambient_length_and_reproducible():
     a, b = ambient(2.0), ambient(2.0)
     assert len(a) == 2 * SR and np.array_equal(a, b)
     assert 0 < np.abs(a).max() <= 1
+
+
+def test_trim_silence_keeps_speech_with_small_margins():
+    sig = np.zeros(3 * SR, np.float32)
+    sig[SR:2 * SR] = 0.5  # 中间 1 秒有声
+    out = trim_silence(sig)
+    assert 1.0 < len(out) / SR < 1.0 + 0.04 + 0.12 + 0.02
+    assert np.abs(out).max() == pytest.approx(0.5)
+    assert len(trim_silence(np.zeros(SR, np.float32))) == 0
 
 
 def test_mix_limits_peak():

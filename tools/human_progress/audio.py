@@ -29,6 +29,18 @@ def write_wav(path: str | Path, signal: np.ndarray) -> None:
         w.writeframes(pcm.tobytes())
 
 
+def trim_silence(signal: np.ndarray, threshold: float = 0.01, lead: float = 0.04,
+                 trail: float = 0.12) -> np.ndarray:
+    """裁掉首尾静音（10ms 平滑包络低于阈值的部分），两端各保留一点余量。"""
+    env = np.convolve(np.abs(signal), np.ones(480) / 480, mode="same")
+    loud = np.nonzero(env > threshold)[0]
+    if len(loud) == 0:
+        return signal[:0]
+    i0 = max(0, loud[0] - round(lead * SR))
+    i1 = min(len(signal), loud[-1] + round(trail * SR))
+    return signal[i0:i1]
+
+
 def place_narration(tl: Timeline, clips: dict[tuple[str, int], np.ndarray]) -> np.ndarray:
     out = np.zeros(round(tl.duration * SR), np.float32)
     for cue in tl.cues:

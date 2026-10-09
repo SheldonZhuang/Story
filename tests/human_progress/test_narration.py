@@ -11,7 +11,7 @@ SECTIONS = [Section("S01", "", "", "", "", None, 5, False, (Line("甲", "a"), Li
 def fake_synth(calls):
     def run(text, out):
         calls.append(text)
-        write_wav(out, np.zeros(SR // 2, np.float32))
+        write_wav(out, np.full(SR // 2, 0.3, np.float32))
     return run
 
 
@@ -39,7 +39,7 @@ def test_retries_then_succeeds(tmp_path, monkeypatch):
         attempts.append(text)
         if len(attempts) < 3:
             raise OSError("network")
-        write_wav(out, np.zeros(10, np.float32))
+        write_wav(out, np.full(SR // 10, 0.3, np.float32))
 
     synthesize(SECTIONS[:1], tmp_path, synth=flaky)
     assert attempts[:3] == ["甲", "甲", "甲"]
