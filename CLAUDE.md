@@ -35,6 +35,23 @@ Story/
 ## 常用命令
 
 ```bash
+# 环境（首次）
+python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
+
+# 测试
+.venv/Scripts/python -m pytest
+
+# 人类进步历程视频：完整构建（配音 → 时间线 → 混音 → SRT → 横竖屏 MP4，约 20 分钟）
+.venv/Scripts/python -m tools.human_progress.build
+# 只导出关键帧检查排版 / 只渲染一个画幅 / 用离线语音
+.venv/Scripts/python -m tools.human_progress.build --keyframes
+.venv/Scripts/python -m tools.human_progress.build --only portrait
+.venv/Scripts/python -m tools.human_progress.build --offline
+```
+
+改旁白只需编辑 `scripts/human-progress.md`；配音按句子内容缓存在 `output/cache/tts/`，未改动的句子不会重新合成。
+
+```bash
 # 按列表拼接片段（list.txt 每行：file 'xxx.mp4'）
 ffmpeg -f concat -safe 0 -i list.txt -c copy output/merged.mp4
 
