@@ -1,0 +1,41 @@
+# 密钥与环境变量（AI 平台 API Key 等）
+.env
+.env.*
+!.env.example
+
+# 渲染输出与中间产物（体积大，可再生成）
+output/
+renders/
+cache/
+tmp/
+*.tmp
+
+# 大体积媒体文件（如需版本管理，改用 Git LFS）
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.wav
+*.flac
+
+# 模型权重
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+
+# 依赖与环境
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
