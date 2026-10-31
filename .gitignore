@@ -39,3 +39,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# 外部背景音乐（多为有版权的歌曲，不入库）
+assets/music/

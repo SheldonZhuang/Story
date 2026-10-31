@@ -53,3 +53,17 @@ def test_ending_resolves_to_tonic():
     assert chord_at(tl, tl.duration - 0.5)[0] == "C"
     future = tl.spans[2]
     assert chord_at(tl, (future.start + future.end) / 2)[0] in {"Fmaj7", "G", "Em7", "Am7"}
+
+
+def test_load_track_fits_duration_with_fades(tmp_path):
+    import subprocess
+    from tools.human_progress.music import load_track
+    src = tmp_path / "song.mp3"  # 3 秒立体声歌曲
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+                    "-ac", "2", str(src)], check=True)
+    looped = load_track(src, 7.0)  # 比视频短：循环补足
+    assert len(looped) == 7 * SR
+    assert np.abs(looped[: SR // 100]).max() < 0.05  # 开头淡入
+    assert np.abs(looped[-SR // 100:]).max() < 0.05  # 结尾淡出
+    assert _rms(looped[int(3.2 * SR):4 * SR]) > 0.05  # 循环回来、尚未淡出的部分有声音
+    assert len(load_track(src, 2.0)) == 2 * SR  # 比视频长：截断

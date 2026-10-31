@@ -1,6 +1,9 @@
 """程序作曲的原创配乐：C 大调，92 BPM，随段落增减乐器，在旁白下自动压低。"""
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
 import numpy as np
 
 from .audio import SR
@@ -170,3 +173,19 @@ def compose(tl: Timeline) -> np.ndarray:
     t = np.arange(n) / SR
     out *= np.clip(np.minimum(t / 2.0, (tl.duration - t) / 2.5), 0, 1)  # 首尾淡入淡出
     return (out / (np.abs(out).max() + 1e-9) * 0.9).astype(np.float32)
+
+
+def load_track(path: str | Path, duration: float, fade_in: float = 1.5, fade_out: float = 3.0) -> np.ndarray:
+    """读取外部音乐文件（任意格式，转为 48kHz 单声道），循环或截断到 duration，首尾淡入淡出。"""
+    pcm = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-f", "s16le", "-ac", "1", "-ar", str(SR), "-"],
+        check=True, capture_output=True,
+    ).stdout
+    track = np.frombuffer(pcm, "<i2").astype(np.float32) / 32768.0
+    if len(track) == 0:
+        raise ValueError(f"{path} 没有可用的音频")
+    n = round(duration * SR)
+    out = np.resize(track, n)  # 短于视频时从头循环
+    t = np.arange(n) / SR
+    out *= np.clip(np.minimum(t / fade_in, (duration - t) / fade_out), 0, 1)
+    return out.astype(np.float32)
