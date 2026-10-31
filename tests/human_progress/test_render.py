@@ -38,3 +38,22 @@ def test_default_workers_respects_cpu_and_memory():
     assert default_workers(cpu=8, avail_mb=RESERVE_MB + 3.5 * WORKER_MB) == 3
     assert default_workers(cpu=8, avail_mb=100_000) == 8
     assert default_workers(cpu=8, avail_mb=500) == 1
+
+
+def test_remux_audio_keeps_video_and_replaces_audio(tmp_path):
+    from tools.human_progress.render import remux_audio
+    sec = Section("S01", "", "", "", "", None, 2, False, (Line("测试。", "Test."),))
+    tl = build_timeline([sec], {("S01", 0): 0.5})
+    save_timeline(tl, tmp_path / "tl.json")
+    n = round(tl.duration * SR)
+    write_wav(tmp_path / "silent.wav", np.zeros(n, np.float32))
+    out = tmp_path / "v.mp4"
+    render_video(tmp_path / "tl.json", PORTRAIT, tmp_path / "silent.wav", out, workers=1)
+    tone = (0.5 * np.sin(2 * np.pi * 440 * np.arange(n) / SR)).astype(np.float32)
+    write_wav(tmp_path / "tone.wav", tone)
+    remux_audio(out, tmp_path / "tone.wav")
+    import subprocess
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", str(out), "-f", "s16le", "-ac", "1", "-"],
+                         capture_output=True, check=True).stdout
+    assert np.abs(np.frombuffer(pcm, "<i2")).max() > 8000  # 新音轨确实换进去了
+    assert probe(out)["width"] == 1080

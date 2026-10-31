@@ -1,6 +1,7 @@
 """音频：WAV 读写、旁白摆放、铺底音合成与混音。全部为 48kHz 单声道 float32。"""
 from __future__ import annotations
 
+import subprocess
 import wave
 from pathlib import Path
 
@@ -51,26 +52,30 @@ def place_narration(tl: Timeline, clips: dict[tuple[str, int], np.ndarray]) -> n
     return out
 
 
-def ambient(duration: float, seed: int = 7) -> np.ndarray:
-    """低频和弦铺底 + 缓慢起伏 + 少量柔化噪声；固定种子保证可复现。"""
-    n = round(duration * SR)
-    t = np.arange(n) / SR
-    rng = np.random.default_rng(seed)
-    out = np.zeros(n)
-    for freq, amp in ((55.0, 0.5), (82.4, 0.32), (110.0, 0.25), (164.8, 0.12), (220.0, 0.06)):
-        lfo = 0.6 + 0.4 * np.sin(2 * np.pi * rng.uniform(0.02, 0.06) * t + rng.uniform(0, 2 * np.pi))
-        out += amp * lfo * np.sin(2 * np.pi * freq * t + rng.uniform(0, 2 * np.pi))
-    noise = np.convolve(rng.standard_normal(n), np.ones(400) / 400, mode="same")
-    out += 0.4 * noise / (np.abs(noise).max() + 1e-9)
-    fade = np.minimum(1, np.minimum(t, duration - t) / 3.0)
-    out *= np.clip(fade, 0, 1)
-    return (out / (np.abs(out).max() + 1e-9)).astype(np.float32)
-
-
-def mix(narration: np.ndarray, bed: np.ndarray, bed_db: float = -18.0) -> np.ndarray:
-    n = len(narration)
-    out = narration + np.resize(bed, n) * 10 ** (bed_db / 20)
+def mix(narration: np.ndarray, music: np.ndarray, duck: np.ndarray, music_db: float = -12.0) -> np.ndarray:
+    """配乐整体响度比旁白发声部分低 music_db，再乘以压低曲线；峰值限制在 PEAK。"""
+    speech = narration[np.abs(narration) > 0.01]
+    speech_rms = float(np.sqrt(np.mean(speech.astype(np.float64) ** 2))) if len(speech) else 0.1
+    music_rms = float(np.sqrt(np.mean(music.astype(np.float64) ** 2))) or 1.0
+    gain = speech_rms / music_rms * 10 ** (music_db / 20)
+    out = narration + music[: len(narration)] * duck[: len(narration)] * gain
     peak = np.abs(out).max()
     if peak > PEAK:
         out *= PEAK / peak
     return out.astype(np.float32)
+
+
+TARGET_LUFS = -16.0  # 主流视频平台的常用响度
+
+
+def normalize_loudness(src: str | Path, dst: str | Path, lufs: float = TARGET_LUFS) -> None:
+    """轻度压缩 + FFmpeg loudnorm 统一响度（真峰值 ≤ -1.5dBTP），输出 48kHz 单声道 16bit WAV。"""
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", str(src),
+         # 先轻度压缩人声峰值，否则真峰值限制会让 loudnorm 达不到目标响度
+         "-af", "acompressor=threshold=0.1:ratio=3:attack=5:release=120:makeup=2,"
+                f"loudnorm=I={lufs}:TP=-1.5:LRA=11",
+         "-ar", str(SR), "-ac", "1", "-sample_fmt", "s16",
+         str(dst)],
+        check=True,
+    )

@@ -4,10 +4,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .audio import ambient, mix, place_narration, read_wav, write_wav
+from .audio import mix, normalize_loudness, place_narration, read_wav, write_wav
 from .layout import LAYOUTS
+from .music import compose, duck_curve
 from .narration import clip_duration, synthesize
-from .render import export_keyframes, probe, render_video
+from .render import export_keyframes, probe, remux_audio, render_video
 from .script import load_script
 from .subtitles import to_srt
 from .timeline import build_timeline, duration_warnings, save_timeline
@@ -23,6 +24,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--keyframes", action="store_true", help="只导出关键帧，不渲染视频")
     ap.add_argument("--offline", action="store_true", help="使用 Windows 离线语音")
     ap.add_argument("--only", choices=sorted(LAYOUTS), help="只渲染一个画幅")
+    ap.add_argument("--audio-only", action="store_true",
+                    help="只重做音轨（配音、配乐、混音）并替换进已有成片，不重新渲染画面")
     ap.add_argument("--workers", type=int, help="渲染进程数（默认按 CPU 和剩余内存自动决定）")
     args = ap.parse_args(argv)
 
@@ -46,14 +49,22 @@ def main(argv: list[str] | None = None) -> None:
 
     audio_path = OUT / f"{NAME}.wav"
     narration = place_narration(tl, {k: read_wav(p) for k, p in clips.items()})
-    write_wav(audio_path, mix(narration, ambient(tl.duration)))
+    raw_mix = OUT / "cache" / f"{NAME}-mix.wav"
+    write_wav(raw_mix, mix(narration, compose(tl), duck_curve(tl, len(narration))))
+    normalize_loudness(raw_mix, audio_path)
     (OUT / f"{NAME}.srt").write_text(to_srt(tl.cues), encoding="utf-8")
 
     sizes = {"landscape": "16x9", "portrait": "9x16"}
     for layout in layouts:
         video = OUT / f"{NAME}-{sizes[layout.name]}.mp4"
-        print(f"渲染：{video.name}")
-        render_video(timeline_path, layout, audio_path, video, workers=args.workers)
+        if args.audio_only:
+            if not video.exists():
+                raise SystemExit(f"{video.name} 不存在，请先完整构建")
+            print(f"替换音轨：{video.name}")
+            remux_audio(video, audio_path)
+        else:
+            print(f"渲染：{video.name}")
+            render_video(timeline_path, layout, audio_path, video, workers=args.workers)
         info = probe(video)
         print(f"完成：{video.name} {info['width']}x{info['height']} {info['duration']:.2f}s")
 

@@ -104,6 +104,19 @@ def _write(ff: subprocess.Popen, data: bytes, k: int, layout: Layout, tl: Timeli
         print(f"  {layout.name}: {k / FPS:5.0f}s / {tl.duration:.0f}s", flush=True)
 
 
+def remux_audio(video_path: str | Path, audio_path: str | Path) -> None:
+    """保留画面（不重新编码），只替换音轨；同样先写临时文件再改名。"""
+    video_path = Path(video_path)
+    part = video_path.with_name(video_path.stem + ".part.mp4")
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", str(video_path), "-i", str(audio_path),
+         "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+         "-movflags", "+faststart", "-shortest", str(part)],
+        check=True,
+    )
+    part.replace(video_path)
+
+
 def export_keyframes(tl: Timeline, layout: Layout, out_dir: str | Path) -> list[Path]:
     """每段的开头、中间、结尾各一帧。"""
     out = Path(out_dir)

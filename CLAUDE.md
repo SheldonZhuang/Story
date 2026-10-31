@@ -47,6 +47,8 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m tools.human_progress.build --keyframes
 .venv/Scripts/python -m tools.human_progress.build --only portrait
 .venv/Scripts/python -m tools.human_progress.build --offline
+# 只改了旁白音量/配乐时：重做音轨并替换进已有成片（约 30 秒，不重新渲染画面）
+.venv/Scripts/python -m tools.human_progress.build --audio-only
 # 内存紧张时手动减少渲染进程（默认按剩余内存自动决定）
 .venv/Scripts/python -m tools.human_progress.build --workers 3
 ```
