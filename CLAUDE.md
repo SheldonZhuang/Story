@@ -47,6 +47,8 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m tools.human_progress.build --keyframes
 .venv/Scripts/python -m tools.human_progress.build --only portrait
 .venv/Scripts/python -m tools.human_progress.build --offline
+# 内存紧张时手动减少渲染进程（默认按剩余内存自动决定）
+.venv/Scripts/python -m tools.human_progress.build --workers 3
 ```
 
 改旁白只需编辑 `scripts/human-progress.md`；配音按句子内容缓存在 `output/cache/tts/`，未改动的句子不会重新合成。
