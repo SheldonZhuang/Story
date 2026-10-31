@@ -76,12 +76,20 @@ def _tokens(text: str) -> list[str]:
     return out
 
 
+NO_LINE_START = "，。、；：！？）》」』”’,.;:!?)"
+
+
 def wrap_text(text: str, fnt: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     lines, cur = [], ""
     for tok in _tokens(text):
         if cur and fnt.getlength((cur + tok).rstrip()) > max_w:
-            lines.append(cur)
-            cur = tok
+            # 避头：标点不能出现在行首，把上一行最后一个字一起带下来
+            if tok[0] in NO_LINE_START and len(cur) > 1 and _is_cjk(cur[-1]):
+                lines.append(cur[:-1])
+                cur = cur[-1] + tok
+            else:
+                lines.append(cur)
+                cur = tok
         else:
             cur += tok
     if cur:

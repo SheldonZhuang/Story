@@ -145,9 +145,9 @@ def s04(ctx: Ctx) -> None:
 def s05(ctx: Ctx) -> None:
     c, t = ctx.c, ctx.t
     c.line([(-1, 0.52), (1, 0.52)], BRONZE, 0.006, 0.5)
-    x = -0.8 + 1.6 * ease(ctx.p)
+    x = -0.5 + 1.0 * ease(ctx.p)  # 竖屏也不贴边
     r = 0.42
-    angle = (x + 0.8) / r  # 无滑动滚动
+    angle = (x + 0.5) / r  # 无滑动滚动
     cy = 0.52 - r
     c.circle(x, cy, r, outline=BRONZE, width=0.03)
     c.circle(x, cy, r * 0.12, fill=BRONZE)
@@ -211,8 +211,10 @@ def s07(ctx: Ctx) -> None:
     lit = ease((ctx.p - 0.15) / 0.5)
     for i, x in enumerate(poles):
         on = clamp01(lit * len(poles) - i)
-        c.circle(x, -0.15, 0.06, outline=WARM, alpha=a, width=0.008)
-        c.glow(x, -0.15, 0.06 + 0.25 * on, WARM, on * (0.9 + 0.05 * math.sin(t * 30 + i)))
+        c.circle(x, -0.15, 0.06, fill=(0.12, 0.1, 0.06), outline=WARM, alpha=a, width=0.008)
+        flicker = 0.9 + 0.05 * math.sin(t * 30 + i)
+        c.glow(x, -0.15, 0.05, WARM, on * flicker)  # 灯丝
+        c.glow(x, -0.05, 0.16, WARM, on * 0.22)  # 照向地面的光晕，不压过电线杆
 
 
 def s08(ctx: Ctx) -> None:
@@ -255,8 +257,12 @@ def s09(ctx: Ctx) -> None:
             for j in range(n):
                 if rng.random() < 0.45:
                     x, y = -0.6 + (i + 0.5) * cell, -0.6 + (j + 0.5) * cell
-                    on = 0.5 + 0.5 * math.sin(t * 3 + i * 1.7 + j * 2.9)
-                    c.glow(x, y, cell * 0.25, GREEN, chip * on * 0.7)
+                    on = 0.55 + 0.45 * math.sin(t * 3 + i * 1.7 + j * 2.9)
+                    h = cell * 0.32  # 每个点亮的格子代表一组晶体管
+                    c.polygon([(x - h, y - h), (x + h, y - h), (x + h, y + h), (x - h, y + h)],
+                              fill=(0.1, 0.45 * on, 0.22), outline=GREEN, alpha=chip * (0.4 + 0.5 * on),
+                              width=0.003)
+                    c.glow(x, y, cell * 0.3, GREEN, chip * on * 0.5)
     if net > 0:
         rng = _rng(10)
         nodes = [(rng.uniform(-0.9, 0.9), rng.uniform(-0.8, 0.8)) for _ in range(22)]

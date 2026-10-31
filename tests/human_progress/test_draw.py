@@ -33,6 +33,16 @@ def test_add_glow_touches_only_bounding_box():
     assert ys.min() >= 70 and ys.max() <= 130 and xs.min() >= 70 and xs.max() <= 130
 
 
+def test_wrap_text_never_starts_line_with_closing_punctuation():
+    fnt = font(52)
+    text = "1942年，第一座核反应堆在芝加哥启动。"
+    width = round(fnt.getlength(text[:-1]))  # 恰好放不下句号
+    lines = wrap_text(text, fnt, width)
+    assert "".join(lines) == text
+    assert all(l[0] not in "，。、；：！？）”" for l in lines)
+    assert all(fnt.getlength(l) <= width for l in lines)
+
+
 @pytest.mark.parametrize("text", [
     "芯片上的晶体管，从几个变成了数百亿个，",
     "In the 2020s, artificial intelligence learned to understand language, write, and code.",
