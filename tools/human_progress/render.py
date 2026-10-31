@@ -16,6 +16,36 @@ from .timeline import Timeline, load_timeline
 
 FPS = 30
 MAX_INFLIGHT_PER_WORKER = 3
+WORKER_MB = 600  # 实测单个渲染进程峰值约 440MB，留余量
+RESERVE_MB = 2000  # 留给 FFmpeg 编码和系统
+
+
+def available_commit_mb() -> float | None:
+    """Windows 上剩余可提交内存（物理内存 + 页面文件）；其他系统返回 None。"""
+    if os.name != "nt":
+        return None
+    import ctypes
+
+    class MemStatus(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong)] + [
+            (n, ctypes.c_ulonglong) for n in (
+                "ullTotalPhys", "ullAvailPhys", "ullTotalPageFile", "ullAvailPageFile",
+                "ullTotalVirtual", "ullAvailVirtual", "ullAvailExtendedVirtual")
+        ]
+
+    st = MemStatus()
+    st.dwLength = ctypes.sizeof(st)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+        return None
+    return st.ullAvailPageFile / 2**20
+
+
+def default_workers(cpu: int | None = None, avail_mb: float | None = None) -> int:
+    """渲染进程数：不超过 CPU 核数，也不超过剩余内存能容纳的数量。"""
+    cpu = cpu or os.cpu_count() or 1
+    if avail_mb is None:
+        return cpu
+    return max(1, min(cpu, int((avail_mb - RESERVE_MB) // WORKER_MB)))
 _worker: tuple[Timeline, Layout] | None = None
 
 
@@ -33,7 +63,8 @@ def render_video(timeline_path: str | Path, layout: Layout, audio_path: str | Pa
                  out_path: str | Path, workers: int | None = None) -> None:
     tl = load_timeline(timeline_path)
     n = round(tl.duration * FPS)
-    workers = workers or os.cpu_count()
+    workers = workers or default_workers(avail_mb=available_commit_mb())
+    print(f"  {layout.name}: {workers} 个渲染进程", flush=True)
     out_path = Path(out_path)
     part = out_path.with_name(out_path.stem + ".part.mp4")  # 成功后再改名，失败不覆盖旧成片
     cmd = [

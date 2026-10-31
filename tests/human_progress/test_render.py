@@ -30,3 +30,11 @@ def test_failed_render_keeps_previous_output(tmp_path):
         # 音频文件不存在 → FFmpeg 失败
         render_video(tmp_path / "tl.json", PORTRAIT, tmp_path / "missing.wav", out, workers=1)
     assert out.read_bytes() == b"previous good video"
+
+
+def test_default_workers_respects_cpu_and_memory():
+    from tools.human_progress.render import RESERVE_MB, WORKER_MB, default_workers
+    assert default_workers(cpu=8, avail_mb=None) == 8
+    assert default_workers(cpu=8, avail_mb=RESERVE_MB + 3.5 * WORKER_MB) == 3
+    assert default_workers(cpu=8, avail_mb=100_000) == 8
+    assert default_workers(cpu=8, avail_mb=500) == 1

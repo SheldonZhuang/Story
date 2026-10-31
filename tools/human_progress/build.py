@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--keyframes", action="store_true", help="只导出关键帧，不渲染视频")
     ap.add_argument("--offline", action="store_true", help="使用 Windows 离线语音")
     ap.add_argument("--only", choices=sorted(LAYOUTS), help="只渲染一个画幅")
+    ap.add_argument("--workers", type=int, help="渲染进程数（默认按 CPU 和剩余内存自动决定）")
     args = ap.parse_args(argv)
 
     OUT.mkdir(exist_ok=True)
@@ -52,7 +53,7 @@ def main(argv: list[str] | None = None) -> None:
     for layout in layouts:
         video = OUT / f"{NAME}-{sizes[layout.name]}.mp4"
         print(f"渲染：{video.name}")
-        render_video(timeline_path, layout, audio_path, video)
+        render_video(timeline_path, layout, audio_path, video, workers=args.workers)
         info = probe(video)
         print(f"完成：{video.name} {info['width']}x{info['height']} {info['duration']:.2f}s")
 
