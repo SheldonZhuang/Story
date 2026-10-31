@@ -49,6 +49,8 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python -m tools.human_progress.build --offline
 # 只改了旁白音量/配乐时：重做音轨并替换进已有成片（约 30 秒，不重新渲染画面）
 .venv/Scripts/python -m tools.human_progress.build --audio-only
+# 原创配乐风格：rnb 氛围感 R&B（默认）/ bright 明亮科普
+.venv/Scripts/python -m tools.human_progress.build --audio-only --music-style bright
 # 换成自己的背景音乐（放在 assets/music/，不入库）；--music-db 调音乐相对旁白的音量
 .venv/Scripts/python -m tools.human_progress.build --audio-only --music "assets/music/歌曲.mp3" --music-db -12
 # 内存紧张时手动减少渲染进程（默认按剩余内存自动决定）

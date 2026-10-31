@@ -146,10 +146,10 @@ def _smooth(x: np.ndarray, seconds: float) -> np.ndarray:
     return ((c[2 * w:] - c[:-2 * w]) / (2 * w))[: len(x)].astype(np.float32)
 
 
-def _section_gain(tl: Timeline, n: int, layer: int) -> np.ndarray:
+def _section_gain(tl: Timeline, n: int, intensity: dict[str, tuple[float, ...]], layer: int) -> np.ndarray:
     g = np.zeros(n, np.float32)
     for span in tl.spans:
-        g[int(span.start * SR):int(span.end * SR) + 1] = INTENSITY[span.section.id][layer]
+        g[int(span.start * SR):int(span.end * SR) + 1] = intensity[span.section.id][layer]
     return _smooth(g, 1.5)
 
 
@@ -169,7 +169,7 @@ def compose(tl: Timeline) -> np.ndarray:
     bufs = _layers(tl, n)
     out = np.zeros(n, np.float32)
     for i, name in enumerate(LAYERS):
-        out += bufs[name] * LEVEL[name] * _section_gain(tl, n, i)
+        out += bufs[name] * LEVEL[name] * _section_gain(tl, n, INTENSITY, i)
     t = np.arange(n) / SR
     out *= np.clip(np.minimum(t / 2.0, (tl.duration - t) / 2.5), 0, 1)  # 首尾淡入淡出
     return (out / (np.abs(out).max() + 1e-9) * 0.9).astype(np.float32)
