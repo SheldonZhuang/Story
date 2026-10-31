@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from collections import deque
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from .layout import LAYOUTS, Layout
 from .timeline import Timeline, load_timeline
 
 FPS = 30
+MAX_INFLIGHT_PER_WORKER = 3
 _worker: tuple[Timeline, Layout] | None = None
 
 
@@ -31,6 +33,9 @@ def render_video(timeline_path: str | Path, layout: Layout, audio_path: str | Pa
                  out_path: str | Path, workers: int | None = None) -> None:
     tl = load_timeline(timeline_path)
     n = round(tl.duration * FPS)
+    workers = workers or os.cpu_count()
+    out_path = Path(out_path)
+    part = out_path.with_name(out_path.stem + ".part.mp4")  # 成功后再改名，失败不覆盖旧成片
     cmd = [
         "ffmpeg", "-y", "-v", "error",
         "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{layout.w}x{layout.h}", "-r", str(FPS), "-i", "-",
@@ -38,19 +43,34 @@ def render_video(timeline_path: str | Path, layout: Layout, audio_path: str | Pa
         "-map", "0:v", "-map", "1:a",
         "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest",
-        str(out_path),
+        str(part),
     ]
     ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    ok = False
     try:
-        with Pool(workers or os.cpu_count(), _init, (str(timeline_path), layout.name)) as pool:
-            for k, data in enumerate(pool.imap(_frame, range(n), chunksize=4)):
-                ff.stdin.write(data)
-                if k % (FPS * 10) == 0:
-                    print(f"  {layout.name}: {k / FPS:5.0f}s / {tl.duration:.0f}s", flush=True)
+        with Pool(workers, _init, (str(timeline_path), layout.name)) as pool:
+            # 限制在途帧数：Pool.imap 没有背压，编码慢于渲染时帧会无限堆积在内存里
+            window: deque = deque()
+            for i in range(n):
+                window.append(pool.apply_async(_frame, (i,)))
+                if len(window) >= workers * MAX_INFLIGHT_PER_WORKER:
+                    _write(ff, window.popleft().get(), i - len(window), layout, tl)
+            while window:
+                _write(ff, window.popleft().get(), n - len(window) - 1, layout, tl)
+        ok = True
     finally:
         ff.stdin.close()
-        if ff.wait() != 0:
-            raise RuntimeError(f"FFmpeg 编码失败：{out_path}")
+        code = ff.wait()
+    if code != 0:
+        raise RuntimeError(f"FFmpeg 编码失败：{out_path}")
+    if ok:
+        part.replace(out_path)
+
+
+def _write(ff: subprocess.Popen, data: bytes, k: int, layout: Layout, tl: Timeline) -> None:
+    ff.stdin.write(data)
+    if k % (FPS * 10) == 0:
+        print(f"  {layout.name}: {k / FPS:5.0f}s / {tl.duration:.0f}s", flush=True)
 
 
 def export_keyframes(tl: Timeline, layout: Layout, out_dir: str | Path) -> list[Path]:

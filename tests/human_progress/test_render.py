@@ -18,3 +18,15 @@ def test_render_short_video(tmp_path):
     info = probe(out)
     assert (info["width"], info["height"]) == (1080, 1920)
     assert info["duration"] == pytest.approx(tl.duration, abs=0.1)
+
+
+def test_failed_render_keeps_previous_output(tmp_path):
+    out = tmp_path / "v.mp4"
+    out.write_bytes(b"previous good video")
+    sec = Section("S01", "", "", "", "", None, 2, False, (Line("测试。", "Test."),))
+    tl = build_timeline([sec], {("S01", 0): 0.5})
+    save_timeline(tl, tmp_path / "tl.json")
+    with pytest.raises(Exception):
+        # 音频文件不存在 → FFmpeg 失败
+        render_video(tmp_path / "tl.json", PORTRAIT, tmp_path / "missing.wav", out, workers=1)
+    assert out.read_bytes() == b"previous good video"
